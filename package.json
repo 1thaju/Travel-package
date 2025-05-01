@@ -1,0 +1,28 @@
+{
+  "name": "express-mongo-api",
+  "version": "1.0.0",
+  "description": "Express.js API with MongoDB",
+  "main": "Backend/server.js",
+  "scripts": {
+    "start": "node Backend/server.js",
+    "dev": "nodemon Backend/server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-session": "^1.18.1",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^7.6.3",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
+    "validator": "^13.15.0"
+  },
+  "devDependencies": {
+    "axios": "^1.9.0",
+    "nodemon": "^3.0.1",
+    "postcss-import": "^16.1.0"
+  }
+}
