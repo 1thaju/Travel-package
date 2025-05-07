@@ -7,34 +7,29 @@ const jwt = require('jsonwebtoken');
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: process.env.GOOGLE_CALLBACK_URL
+    callbackURL: 'http://localhost:5000/api/auth/google/callback',
 }, async (accessToken, refreshToken, profile, done) => {
     try {
-        const existingUser = await User.findOne({ googleId: profile.id });
-
-        if (existingUser) {
-            return done(null, existingUser);
+        let user = await User.findOne({ googleId: profile.id });
+        if (!user) {
+            user = await User.create({
+                name: profile.displayName,
+                email: profile.emails[0].value,
+                googleId: profile.id,
+                profilePicture: profile.photos[0].value,
+                role: 'user'
+            });
         }
-
-        const newUser = new User({
-            name: profile.displayName,
-            email: profile.emails[0].value,
-            googleId: profile.id
-        });
-
-        await newUser.save();
-        done(null, newUser);
-    } catch (error) {
-        done(error, false);
+        return done(null, user);
+    } catch (err) {
+        return done(err, null);
     }
 }));
 
+// Serialize/deserialize (not used with JWT, but required by Passport)
 passport.serializeUser((user, done) => {
     done(null, user.id);
 });
-
 passport.deserializeUser((id, done) => {
-    User.findById(id, (err, user) => {
-        done(err, user);
-    });
+    User.findById(id, (err, user) => done(err, user));
 });

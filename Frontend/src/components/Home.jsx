@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import API from '../api/adminApi';
 
 export default function Home() {
   const [packages, setPackages] = useState([]);
@@ -18,39 +19,25 @@ export default function Home() {
     sortOrder: 'asc'
   });
 
-  const handleSearch = async (e) => {
-    e?.preventDefault();
+  const fetchPackages = async () => {
     setLoading(true);
     setError('');
-
+    const params = new URLSearchParams();
+    Object.entries(searchParams).forEach(([key, value]) => {
+      if (value) params.append(key, value);
+    });
     try {
-      const queryString = new URLSearchParams({
-        ...searchParams,
-        page: 1,
-        limit: 10
-      }).toString();
-
-      const response = await fetch(`http://localhost:3000/api/travel-packages/search?${queryString}`, {
-        headers: { 'Accept': 'application/json' },
-        credentials: 'include'
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch packages');
-      }
-
-      setPackages(data.data);
+      const res = await API.get(`/travel-packages?${params.toString()}`);
+      setPackages(res.data.data || []);
     } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      setError(err.response?.data?.message || err.message);
+      console.error('Error fetching packages:', err);
     }
+    setLoading(false);
   };
 
   useEffect(() => {
-    handleSearch();
+    fetchPackages();
   }, []);
 
   const handleInputChange = (e) => {

@@ -1,4 +1,5 @@
 const TravelPackage = require('../models/TravelPackage');
+const Booking = require('../models/Booking');
 
 // Get all travel packages with filters
 const getAllPackages = async (req, res) => {
@@ -193,11 +194,31 @@ const getAnalytics = async (req, res) => {
     }
 };
 
+// Admin analytics: Get package status and booking count per package
+const getPackageStatusAndBookingCount = async (req, res) => {
+    try {
+        const today = new Date();
+        const packages = await TravelPackage.find();
+        const result = await Promise.all(packages.map(async pkg => {
+            let status = '';
+            if (pkg.endDate < today) status = 'Completed';
+            else if (pkg.startDate > today) status = 'Upcoming';
+            else status = 'Active';
+            const bookingCount = await Booking.countDocuments({ package: pkg._id });
+            return { ...pkg.toObject(), status, bookingCount };
+        }));
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     getAllPackages,
     getPackage,
     createPackage,
     updatePackage,
     deletePackage,
-    getAnalytics
+    getAnalytics,
+    getPackageStatusAndBookingCount
 }; 

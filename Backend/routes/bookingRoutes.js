@@ -8,14 +8,17 @@ const {
     getBooking,
     updateBookingStatus,
     cancelBooking,
-    getBookingAnalytics
+    getBookingAnalytics,
+    getAllUsersBookings,
+    getBookingStats
 } = require('../controllers/bookingController');
+const { isAuthenticatedUser } = require('../middleware/auth');
 
 // Protected routes for all authenticated users
 router.use(protect);
 
-router.post('/', createBooking);
-router.get('/my-bookings', getUserBookings);
+router.post('/', isAuthenticatedUser, createBooking);
+router.get('/my', isAuthenticatedUser, getUserBookings);
 router.get('/:id', getBooking);
 router.put('/:id/cancel', cancelBooking);
 
@@ -25,5 +28,7 @@ router.use(authorizeRoles('admin'));
 router.get('/', getAllBookings);
 router.put('/:id/status', updateBookingStatus);
 router.get('/admin/analytics', getBookingAnalytics);
+router.get('/admin/users-bookings', getAllUsersBookings);
+router.get('/admin/package-stats', getBookingStats);
 
 module.exports = router; 

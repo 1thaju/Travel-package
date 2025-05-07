@@ -1,333 +1,220 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
+import React, { useEffect, useState } from 'react';
+import API from '../../api/adminApi';
 
-export default function PackageManagement() {
+const initialForm = {
+  from: '',
+  to: '',
+  startDate: '',
+  endDate: '',
+  basePrice: '',
+  includedServices: { food: false, accommodation: false }
+};
+
+const PackageManagement = () => {
   const [packages, setPackages] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState(initialForm);
+  const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingPackage, setEditingPackage] = useState(null);
-  const { authFetch } = useAuth();
+  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [analytics, setAnalytics] = useState([]);
+  const [usersWithBookings, setUsersWithBookings] = useState([]);
 
-  const [formData, setFormData] = useState({
-    name: '',
-    from: '',
-    to: '',
-    startDate: '',
-    endDate: '',
-    price: '',
-    description: '',
-    imageUrl: '',
-    availableSeats: ''
-  });
+  // Fetch all packages
+  const fetchPackages = async () => {
+    setLoading(true);
+    const res = await API.get('/travel-packages');
+    setPackages(res.data.data || res.data);
+    setLoading(false);
+  };
+
+  // Fetch analytics
+  const fetchAnalytics = async () => {
+    const res = await API.get('/travel-packages/admin/status-booking-count');
+    setAnalytics(res.data);
+  };
+
+  // Fetch users with bookings
+  const fetchUsersWithBookings = async () => {
+    const res = await API.get('/users/admin/with-bookings');
+    setUsersWithBookings(res.data);
+  };
 
   useEffect(() => {
     fetchPackages();
+    fetchAnalytics();
+    fetchUsersWithBookings();
   }, []);
 
-  const fetchPackages = async () => {
-    try {
-      const response = await authFetch('/travel-packages');
-      setPackages(response.data);
-    } catch (err) {
-      setError('Failed to fetch packages');
-    } finally {
-      setLoading(false);
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    if (name === 'food' || name === 'accommodation') {
+      setForm({ ...form, includedServices: { ...form.includedServices, [name]: checked } });
+    } else {
+      setForm({ ...form, [name]: value });
     }
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      from: '',
-      to: '',
-      startDate: '',
-      endDate: '',
-      price: '',
-      description: '',
-      imageUrl: '',
-      availableSeats: ''
-    });
-    setEditingPackage(null);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-
+    setSuccess('');
     try {
-      const url = editingPackage 
-        ? `/travel-packages/${editingPackage._id}`
-        : '/travel-packages';
-      
-      const method = editingPackage ? 'PUT' : 'POST';
-      
-      await authFetch(url, {
-        method,
-        body: JSON.stringify(formData)
-      });
-
-      await fetchPackages();
-      setIsModalOpen(false);
-      resetForm();
+      if (editingId) {
+        await API.put(`/travel-packages/${editingId}`, form);
+        setSuccess('Package updated!');
+      } else {
+        await API.post('/travel-packages', form);
+        setSuccess('Package added!');
+      }
+      setForm(initialForm);
+      setEditingId(null);
+      fetchPackages();
+      fetchAnalytics();
     } catch (err) {
-      setError(err.message || 'Failed to save package');
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this package?')) {
-      return;
-    }
-
-    try {
-      await authFetch(`/travel-packages/${id}`, {
-        method: 'DELETE'
-      });
-      await fetchPackages();
-    } catch (err) {
-      setError('Failed to delete package');
+      setError(err.message);
     }
   };
 
   const handleEdit = (pkg) => {
-    setEditingPackage(pkg);
-    setFormData({
-      name: pkg.name,
+    setForm({
       from: pkg.from,
       to: pkg.to,
-      startDate: pkg.startDate.split('T')[0],
-      endDate: pkg.endDate.split('T')[0],
-      price: pkg.price,
-      description: pkg.description,
-      imageUrl: pkg.imageUrl,
-      availableSeats: pkg.availableSeats
+      startDate: pkg.startDate.slice(0, 10),
+      endDate: pkg.endDate.slice(0, 10),
+      basePrice: pkg.basePrice,
+      includedServices: pkg.includedServices || { food: false, accommodation: false }
     });
-    setIsModalOpen(true);
+    setEditingId(pkg._id);
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this package?')) return;
+    setError('');
+    setSuccess('');
+    try {
+      await API.delete(`/travel-packages/${id}`);
+      setSuccess('Package deleted!');
+      fetchPackages();
+      fetchAnalytics();
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Package Management</h1>
-        <button
-          onClick={() => {
-            resetForm();
-            setIsModalOpen(true);
-          }}
-          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-        >
-          Add New Package
-        </button>
-      </div>
-
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
-          {error}
+    <div className="container py-8">
+      <h1 className="text-2xl font-bold mb-4">Admin: Package Management</h1>
+      <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow mb-8 max-w-xl">
+        <h2 className="text-lg font-semibold mb-4">{editingId ? 'Edit Package' : 'Add Package'}</h2>
+        {error && <div className="text-red-500 mb-2">{error}</div>}
+        {success && <div className="text-green-600 mb-2">{success}</div>}
+        <div className="flex gap-4 mb-2">
+          <input name="from" value={form.from} onChange={handleChange} placeholder="From" className="p-2 border rounded w-full" required />
+          <input name="to" value={form.to} onChange={handleChange} placeholder="To" className="p-2 border rounded w-full" required />
         </div>
-      )}
-
-      {loading ? (
-        <div className="flex justify-center items-center h-32">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="flex gap-4 mb-2">
+          <input name="startDate" type="date" value={form.startDate} onChange={handleChange} className="p-2 border rounded w-full" required />
+          <input name="endDate" type="date" value={form.endDate} onChange={handleChange} className="p-2 border rounded w-full" required />
         </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">From</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">To</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dates</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+        <input name="basePrice" type="number" value={form.basePrice} onChange={handleChange} placeholder="Base Price" className="p-2 border rounded w-full mb-2" required />
+        <div className="flex gap-4 mb-4">
+          <label className="inline-flex items-center">
+            <input type="checkbox" name="food" checked={form.includedServices.food} onChange={handleChange} className="mr-2" /> Food
+          </label>
+          <label className="inline-flex items-center">
+            <input type="checkbox" name="accommodation" checked={form.includedServices.accommodation} onChange={handleChange} className="mr-2" /> Accommodation
+          </label>
+        </div>
+        <button type="submit" className="btn-primary w-full">{editingId ? 'Update' : 'Add'} Package</button>
+        {editingId && <button type="button" onClick={() => { setForm(initialForm); setEditingId(null); }} className="w-full mt-2 text-blue-600 underline">Cancel Edit</button>}
+      </form>
+      <h2 className="text-lg font-semibold mb-2">All Packages</h2>
+      {loading ? <div>Loading...</div> : (
+        <table className="w-full bg-white rounded shadow">
+          <thead>
+            <tr>
+              <th className="p-2 border">From</th>
+              <th className="p-2 border">To</th>
+              <th className="p-2 border">Start</th>
+              <th className="p-2 border">End</th>
+              <th className="p-2 border">Price</th>
+              <th className="p-2 border">Food</th>
+              <th className="p-2 border">Accommodation</th>
+              <th className="p-2 border">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {packages.map(pkg => (
+              <tr key={pkg._id}>
+                <td className="p-2 border">{pkg.from}</td>
+                <td className="p-2 border">{pkg.to}</td>
+                <td className="p-2 border">{new Date(pkg.startDate).toLocaleDateString()}</td>
+                <td className="p-2 border">{new Date(pkg.endDate).toLocaleDateString()}</td>
+                <td className="p-2 border">${pkg.basePrice}</td>
+                <td className="p-2 border text-center">{pkg.includedServices.food ? '✔️' : ''}</td>
+                <td className="p-2 border text-center">{pkg.includedServices.accommodation ? '✔️' : ''}</td>
+                <td className="p-2 border">
+                  <button onClick={() => handleEdit(pkg)} className="text-blue-600 mr-2 underline">Edit</button>
+                  <button onClick={() => handleDelete(pkg._id)} className="text-red-600 underline">Delete</button>
+                </td>
               </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {packages.map((pkg) => (
-                <tr key={pkg._id}>
-                  <td className="px-6 py-4 whitespace-nowrap">{pkg.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{pkg.from}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{pkg.to}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {new Date(pkg.startDate).toLocaleDateString()} - {new Date(pkg.endDate).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">${pkg.price}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      onClick={() => handleEdit(pkg)}
-                      className="text-blue-600 hover:text-blue-900 mr-4"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(pkg._id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       )}
 
-      {/* Add/Edit Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium text-gray-900">
-                {editingPackage ? 'Edit Package' : 'Add New Package'}
-              </h3>
-              <button
-                onClick={() => {
-                  setIsModalOpen(false);
-                  resetForm();
-                }}
-                className="text-gray-400 hover:text-gray-500"
-              >
-                ×
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Name</label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  required
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">From</label>
-                  <input
-                    type="text"
-                    name="from"
-                    value={formData.from}
-                    onChange={handleInputChange}
-                    required
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">To</label>
-                  <input
-                    type="text"
-                    name="to"
-                    value={formData.to}
-                    onChange={handleInputChange}
-                    required
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Start Date</label>
-                  <input
-                    type="date"
-                    name="startDate"
-                    value={formData.startDate}
-                    onChange={handleInputChange}
-                    required
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">End Date</label>
-                  <input
-                    type="date"
-                    name="endDate"
-                    value={formData.endDate}
-                    onChange={handleInputChange}
-                    required
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Price</label>
-                  <input
-                    type="number"
-                    name="price"
-                    value={formData.price}
-                    onChange={handleInputChange}
-                    required
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Available Seats</label>
-                  <input
-                    type="number"
-                    name="availableSeats"
-                    value={formData.availableSeats}
-                    onChange={handleInputChange}
-                    required
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Description</label>
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  required
-                  rows="3"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Image URL</label>
-                <input
-                  type="url"
-                  name="imageUrl"
-                  value={formData.imageUrl}
-                  onChange={handleInputChange}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                />
-              </div>
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsModalOpen(false);
-                    resetForm();
-                  }}
-                  className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                >
-                  {editingPackage ? 'Update' : 'Create'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Analytics Section */}
+      <h2 className="text-lg font-semibold mt-8 mb-2">Package Analytics</h2>
+      <table className="w-full bg-white rounded shadow mb-8">
+        <thead>
+          <tr>
+            <th className="p-2 border">From</th>
+            <th className="p-2 border">To</th>
+            <th className="p-2 border">Status</th>
+            <th className="p-2 border">Booking Count</th>
+          </tr>
+        </thead>
+        <tbody>
+          {analytics.map(pkg => (
+            <tr key={pkg._id}>
+              <td className="p-2 border">{pkg.from}</td>
+              <td className="p-2 border">{pkg.to}</td>
+              <td className="p-2 border">{pkg.status}</td>
+              <td className="p-2 border">{pkg.bookingCount}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Users with Bookings Section */}
+      <h2 className="text-lg font-semibold mt-8 mb-2">All Users & Bookings</h2>
+      <table className="w-full bg-white rounded shadow">
+        <thead>
+          <tr>
+            <th className="p-2 border">User</th>
+            <th className="p-2 border">Email</th>
+            <th className="p-2 border">Bookings</th>
+          </tr>
+        </thead>
+        <tbody>
+          {usersWithBookings.map(user => (
+            <tr key={user._id}>
+              <td className="p-2 border">{user.name}</td>
+              <td className="p-2 border">{user.email}</td>
+              <td className="p-2 border">
+                {user.bookings.map(b => (
+                  <div key={b._id}>
+                    {b.package ? `${b.package.from} → ${b.package.to}` : 'N/A'}
+                  </div>
+                ))}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
-} 
+};
+
+export default PackageManagement; 

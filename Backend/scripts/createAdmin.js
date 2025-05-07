@@ -2,6 +2,7 @@ const path = require('path');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 const User = require('../models/User');
+const bcrypt = require('bcrypt');
 
 // Load environment variables
 const envPath = path.resolve(__dirname, '../.env');
@@ -49,6 +50,9 @@ const createAdminUser = async () => {
             await mongoose.disconnect();
             process.exit(0);
         }
+
+        // Hash the password
+        adminUser.password = await bcrypt.hash(adminUser.password, 10);
 
         // Create new admin user
         const user = new User(adminUser);

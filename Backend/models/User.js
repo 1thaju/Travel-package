@@ -53,10 +53,15 @@ const userSchema = new mongoose.Schema({
 // Encrypt password before saving
 userSchema.pre('save', async function(next) {
     if (!this.isModified('password')) {
-        next();
+        return next();
     }
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
+    try {
+        const salt = await bcrypt.genSalt(10);
+        this.password = await bcrypt.hash(this.password, salt);
+        next();
+    } catch (error) {
+        next(error);
+    }
 });
 
 // Sign JWT and return
@@ -70,7 +75,11 @@ userSchema.methods.getJwtToken = function() {
 
 // Match password
 userSchema.methods.comparePassword = async function(enteredPassword) {
-    return await bcrypt.compare(enteredPassword, this.password);
+    try {
+        return await bcrypt.compare(enteredPassword, this.password);
+    } catch (error) {
+        throw new Error('Error comparing passwords: ' + error.message);
+    }
 };
 
 // Generate password reset token

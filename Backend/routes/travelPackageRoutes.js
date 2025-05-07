@@ -7,20 +7,25 @@ const {
     createPackage,
     updatePackage,
     deletePackage,
-    getAnalytics
+    getAnalytics,
+    getPackageStatusAndBookingCount
 } = require('../controllers/travelPackageController');
+const { isAuthenticatedUser } = require('../middleware/auth');
+
+const admin = (req, res, next) => {
+    if (req.user && req.user.role === 'admin') return next();
+    return res.status(403).json({ message: 'Admin access required' });
+};
 
 // Public routes
 router.get('/', getAllPackages);
 router.get('/:id', getPackage);
 
-// Protected admin routes
-router.use(protect);
-router.use(authorizeRoles('admin'));
-
-router.post('/', createPackage);
-router.put('/:id', updatePackage);
-router.delete('/:id', deletePackage);
-router.get('/admin/analytics', getAnalytics);
+// Admin-only routes
+router.post('/', isAuthenticatedUser, admin, createPackage);
+router.put('/:id', isAuthenticatedUser, admin, updatePackage);
+router.delete('/:id', isAuthenticatedUser, admin, deletePackage);
+router.get('/admin/analytics', isAuthenticatedUser, admin, getAnalytics);
+router.get('/admin/status-booking-count', isAuthenticatedUser, admin, getPackageStatusAndBookingCount);
 
 module.exports = router; 
