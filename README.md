@@ -138,7 +138,3 @@ Travel Package/
 - POST `/api/bookings` - Create booking
 - PUT `/api/bookings/:id` - Update booking
 - DELETE `/api/bookings/:id` - Cancel booking
-
-## License
-
-MIT 
