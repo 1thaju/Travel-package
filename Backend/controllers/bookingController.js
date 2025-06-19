@@ -43,7 +43,8 @@ const createBooking = async (req, res) => {
             selectedServices,
             totalPrice,
             numberOfTravelers,
-            specialRequests
+            specialRequests,
+            status: 'Accepted'
         });
 
         // Update package's current bookings

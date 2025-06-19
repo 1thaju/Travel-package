@@ -18,6 +18,7 @@ export default function Login() {
       navigate('/');
     } else {
       setLocalError('Invalid credentials or server error');
+      console.log('Login failed:', error);
     }
   };
 
